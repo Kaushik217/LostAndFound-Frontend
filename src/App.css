@@ -182,3 +182,166 @@
     border-right-color: var(--border);
   }
 }
+
+/* Search Match page */
+.search-match {
+  display: flex;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.search-match__main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px;
+}
+
+.search-match__container {
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
+}
+
+.search-match__header,
+.search-match__result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.search-match__header {
+  margin-bottom: 32px;
+}
+
+.search-match__heading,
+.search-match__account {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: 8px;
+}
+
+.search-match__account {
+  flex-wrap: wrap;
+}
+
+.search-match__account .MuiChip-root {
+  max-width: 100%;
+}
+
+.search-match .search-match__filters,
+.search-match .search-match__result {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgb(15 23 42 / 4%);
+}
+
+.search-match .search-match__filters {
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.search-match__filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.search-match__field {
+  min-width: 0;
+}
+
+.search-match__keyword,
+.search-match__filter-actions {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.search-match__filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.search-match .search-match__result {
+  padding: 20px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.search-match .search-match__result:hover {
+  border-color: #99f6e4;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 7%);
+}
+
+.search-match__result-info {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.search-match__result-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.search-match .search-match__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.search-match__details {
+  overflow-wrap: anywhere;
+}
+
+.search-match__details .search-match__description {
+  padding: 16px;
+  margin-top: 4px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 599px) {
+  .search-match__main {
+    padding: 16px;
+  }
+
+  .search-match__filter-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .search-match .search-match__filters,
+  .search-match .search-match__result {
+    padding: 16px;
+  }
+
+  .search-match__filter-actions > .MuiButton-root {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-match .search-match__result {
+    transition: none;
+  }
+}
+
+.search-match__results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

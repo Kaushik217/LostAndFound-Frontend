@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -12,13 +12,11 @@ import {
   TextField,
   MenuItem,
   Card,
-  CardContent,
   Avatar,
   Chip,
   IconButton,
   Alert,
   CircularProgress,
-  Grid,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -44,6 +42,7 @@ import {
   updateItemStatus,
 } from '../services/itemService';
 import { logoutUser } from '../services/authService';
+import '../App.css';
 
 const drawerWidth = 240;
 
@@ -65,7 +64,7 @@ const SearchMatch = ({ user, onLogout }) => {
   const [locations, setLocations] = useState([]);
   const [items, setItems] = useState([]);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -82,11 +81,26 @@ const SearchMatch = ({ user, onLogout }) => {
   const location = useLocation();
 
   useEffect(() => {
-    loadLookupsAndItems();
+    let cancelled = false;
+    Promise.all([getCategories(), getLocations(), searchItems()])
+      .then(([catData, locData, itemData]) => {
+        if (cancelled) return;
+        setCategories(catData);
+        setLocations(locData);
+        setItems(itemData);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load items or lookup data.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const loadLookupsAndItems = async () => {
     try {
+      setError('');
       setLoading(true);
       const [catData, locData, itemData] = await Promise.all([
         getCategories(),
@@ -96,7 +110,7 @@ const SearchMatch = ({ user, onLogout }) => {
       setCategories(catData);
       setLocations(locData);
       setItems(itemData);
-    } catch (err) {
+    } catch {
       setError('Failed to load items or lookup data.');
     } finally {
       setLoading(false);
@@ -106,6 +120,7 @@ const SearchMatch = ({ user, onLogout }) => {
   const handleSearch = async (e) => {
     if (e) e.preventDefault();
     try {
+      setError('');
       setLoading(true);
       const results = await searchItems({
         search: keyword,
@@ -115,7 +130,7 @@ const SearchMatch = ({ user, onLogout }) => {
         status: status || undefined,
       });
       setItems(results);
-    } catch (err) {
+    } catch {
       setError('Search failed. Please try again.');
     } finally {
       setLoading(false);
@@ -228,7 +243,7 @@ const SearchMatch = ({ user, onLogout }) => {
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+    <Box className="search-match">
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -251,20 +266,11 @@ const SearchMatch = ({ user, onLogout }) => {
         {sidebar}
       </Drawer>
 
-      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 4 } }}>
-        <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+      <Box component="main" className="search-match__main">
+        <Box className="search-match__container">
           {/* Header Row */}
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 2,
-              mb: 4,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box className="search-match__header">
+            <Box className="search-match__heading">
               <IconButton
                 onClick={() => setMobileOpen(true)}
                 sx={{ display: { md: 'none' } }}
@@ -282,7 +288,7 @@ const SearchMatch = ({ user, onLogout }) => {
               </Box>
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box className="search-match__account">
               <Chip
                 avatar={<Avatar sx={{ bgcolor: '#0284c7' }}>{user?.name?.[0] || 'U'}</Avatar>}
                 label={`${user?.name || 'User'} • ${user?.role || 'Student'}`}
@@ -305,10 +311,10 @@ const SearchMatch = ({ user, onLogout }) => {
           {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
           {/* Search Filters Card */}
-          <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', p: 3, mb: 4 }}>
+          <Card elevation={0} className="search-match__filters">
             <form onSubmit={handleSearch}>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
+              <Box className="search-match__filter-grid">
+                <Box className="search-match__keyword">
                   <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
                     Keyword
                   </Typography>
@@ -316,12 +322,13 @@ const SearchMatch = ({ user, onLogout }) => {
                     fullWidth
                     size="small"
                     placeholder="Search by name or description..."
+                    slotProps={{ htmlInput: { "aria-label": "Keyword" } }}
                     value={keyword}
                     onChange={(e) => setKeyword(e.target.value)}
                   />
-                </Grid>
+                </Box>
 
-                <Grid item xs={12} sm={6}>
+                <Box className="search-match__field">
                   <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
                     Type
                   </Typography>
@@ -329,6 +336,7 @@ const SearchMatch = ({ user, onLogout }) => {
                     select
                     fullWidth
                     size="small"
+                    slotProps={{ htmlInput: { "aria-label": "Type" }, select: { displayEmpty: true } }}
                     value={type}
                     onChange={(e) => setType(e.target.value)}
                   >
@@ -336,9 +344,9 @@ const SearchMatch = ({ user, onLogout }) => {
                     <MenuItem value="Lost">Lost</MenuItem>
                     <MenuItem value="Found">Found</MenuItem>
                   </TextField>
-                </Grid>
+                </Box>
 
-                <Grid item xs={12} sm={6}>
+                <Box className="search-match__field">
                   <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
                     Category
                   </Typography>
@@ -346,6 +354,7 @@ const SearchMatch = ({ user, onLogout }) => {
                     select
                     fullWidth
                     size="small"
+                    slotProps={{ htmlInput: { "aria-label": "Category" }, select: { displayEmpty: true } }}
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
                   >
@@ -356,9 +365,9 @@ const SearchMatch = ({ user, onLogout }) => {
                       </MenuItem>
                     ))}
                   </TextField>
-                </Grid>
+                </Box>
 
-                <Grid item xs={12} sm={6}>
+                <Box className="search-match__field">
                   <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
                     Location
                   </Typography>
@@ -366,6 +375,7 @@ const SearchMatch = ({ user, onLogout }) => {
                     select
                     fullWidth
                     size="small"
+                    slotProps={{ htmlInput: { "aria-label": "Location" }, select: { displayEmpty: true } }}
                     value={locationId}
                     onChange={(e) => setLocationId(e.target.value)}
                   >
@@ -376,9 +386,9 @@ const SearchMatch = ({ user, onLogout }) => {
                       </MenuItem>
                     ))}
                   </TextField>
-                </Grid>
+                </Box>
 
-                <Grid item xs={12} sm={6}>
+                <Box className="search-match__field">
                   <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
                     Status
                   </Typography>
@@ -386,6 +396,7 @@ const SearchMatch = ({ user, onLogout }) => {
                     select
                     fullWidth
                     size="small"
+                    slotProps={{ htmlInput: { "aria-label": "Status" }, select: { displayEmpty: true } }}
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                   >
@@ -395,10 +406,11 @@ const SearchMatch = ({ user, onLogout }) => {
                     <MenuItem value="Claimed">Claimed</MenuItem>
                     <MenuItem value="Resolved">Resolved</MenuItem>
                   </TextField>
-                </Grid>
+                </Box>
 
-                <Grid item xs={12} display="flex" gap={2} mt={1}>
+                <Box className="search-match__filter-actions">
                   <Button
+                    disabled={loading}
                     type="submit"
                     variant="contained"
                     startIcon={<Search />}
@@ -407,6 +419,7 @@ const SearchMatch = ({ user, onLogout }) => {
                     Search
                   </Button>
                   <Button
+                    disabled={loading}
                     type="button"
                     variant="outlined"
                     startIcon={<Clear />}
@@ -415,8 +428,8 @@ const SearchMatch = ({ user, onLogout }) => {
                   >
                     Clear
                   </Button>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </form>
           </Card>
 
@@ -430,15 +443,22 @@ const SearchMatch = ({ user, onLogout }) => {
             <Box display="flex" justifyContent="center" py={6}>
               <CircularProgress />
             </Box>
+          ) : items.length === 0 ? (
+            <Card elevation={0} className="search-match__empty">
+              <Search fontSize="large" color="action" />
+              <Typography variant="h6" fontWeight="bold">No reports found</Typography>
+              <Typography color="text.secondary">Try another search or clear your filters.</Typography>
+              <Button onClick={handleClear}>Clear filters</Button>
+            </Card>
           ) : (
-            <Box display="flex" flexDirection="column" gap={2}>
+            <Box className="search-match__results">
               {items.map((item) => {
                 const isLost = item.type === 'Lost';
                 return (
-                  <Card key={item.id} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', p: 2 }}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
-                      <Box>
-                        <Box display="flex" alignItems="center" gap={1.5} mb={1}>
+                  <Card key={item.id} elevation={0} className="search-match__result">
+                    <Box className="search-match__result-row">
+                      <Box className="search-match__result-info">
+                        <Box className="search-match__result-title">
                           <Typography variant="subtitle1" fontWeight="bold" color="#0f172a">
                             {item.name}
                           </Typography>
@@ -489,7 +509,7 @@ const SearchMatch = ({ user, onLogout }) => {
           Item Details #{selectedItem?.id}
         </DialogTitle>
         <Divider />
-        <DialogContent sx={{ mt: 2 }}>
+        <DialogContent className="search-match__details" sx={{ mt: 2 }}>
           {selectedItem && (
             <Box display="flex" flexDirection="column" gap={2}>
               <Box>
@@ -497,7 +517,7 @@ const SearchMatch = ({ user, onLogout }) => {
                 <Typography variant="h6" fontWeight="bold">{selectedItem.name}</Typography>
               </Box>
 
-              <Box display="flex" gap={2}>
+              <Box display="flex" flexWrap="wrap" gap={2}>
                 <Chip
                   label={`Type: ${selectedItem.type}`}
                   color={selectedItem.type === 'Lost' ? 'error' : 'success'}
@@ -527,7 +547,7 @@ const SearchMatch = ({ user, onLogout }) => {
 
               <Box>
                 <Typography variant="caption" color="text.secondary">Description</Typography>
-                <Typography variant="body2" sx={{ backgroundColor: '#f1f5f9', p: 2, borderRadius: 2, mt: 0.5 }}>
+                <Typography variant="body2" className="search-match__description">
                   {selectedItem.description}
                 </Typography>
               </Box>
