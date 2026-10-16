@@ -1,3 +1,4 @@
+import UserProfile from '../components/UserProfile';
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -13,8 +14,6 @@ import {
   MenuItem,
   Card,
   CardContent,
-  Avatar,
-  Chip,
   IconButton,
   Alert,
   CircularProgress,
@@ -32,6 +31,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getCategories, getLocations, createLostItem } from '../services/itemService';
 import { logoutUser } from '../services/authService';
 
+import { MIN_DESCRIPTION_LENGTH, validateDescription, getReportApiErrors } from '../utils/reportValidation';
+
 const drawerWidth = 240;
 
 const menuItems = [
@@ -44,6 +45,9 @@ const menuItems = [
 const ReportLost = ({ user, onLogout }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [descriptionTouched, setDescriptionTouched] = useState(false);
+  const [descriptionApiError, setDescriptionApiError] = useState('');
+  const descriptionError = descriptionApiError || (descriptionTouched ? validateDescription(description) : '');
   const [categoryId, setCategoryId] = useState('');
   const [locationId, setLocationId] = useState('');
   const [dateOccurred, setDateOccurred] = useState('');
@@ -81,7 +85,11 @@ const ReportLost = ({ user, onLogout }) => {
     setError('');
     setSuccess('');
 
-    if (!name || !description || !categoryId || !locationId || !dateOccurred) {
+    setDescriptionTouched(true);
+    setDescriptionApiError('');
+    if (validateDescription(description)) return;
+
+    if (!name || !categoryId || !locationId || !dateOccurred) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -90,7 +98,7 @@ const ReportLost = ({ user, onLogout }) => {
       setSubmitting(true);
       await createLostItem({
         name,
-        description,
+        description: description.trim(),
         categoryId: Number(categoryId),
         locationId: Number(locationId),
         dateOccurred,
@@ -100,7 +108,9 @@ const ReportLost = ({ user, onLogout }) => {
         navigate('/dashboard');
       }, 1500);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit report. Please try again.');
+      const apiErrors = getReportApiErrors(err.response?.data);
+      setDescriptionApiError(apiErrors.description);
+      setError(apiErrors.general);
     } finally {
       setSubmitting(false);
     }
@@ -113,10 +123,10 @@ const ReportLost = ({ user, onLogout }) => {
   };
 
   const sidebar = (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', flex: 1 }}>
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #334155' }}>
         <School sx={{ fontSize: 28, color: '#38bdf8' }} />
-        <Typography variant="subtitle1" fontWeight="bold" lineHeight={1.3}>
+        <Typography className="app-logo" variant="subtitle1">
           Campus <br /> Lost & Found
         </Typography>
       </Box>
@@ -148,6 +158,16 @@ const ReportLost = ({ user, onLogout }) => {
           );
         })}
       </List>
+      <Box sx={{ mt: 'auto', p: 2, borderTop: '1px solid #334155' }}>
+        <Button
+          fullWidth
+          startIcon={<Logout />}
+          onClick={handleLogout}
+          sx={{ justifyContent: 'flex-start', color: '#ffffff', textTransform: 'none', borderRadius: 2, px: 2, py: 1.2, '&:hover': { backgroundColor: '#1e293b' } }}
+        >
+          Logout
+        </Button>
+      </Box>
     </Box>
   );
 
@@ -214,21 +234,7 @@ const ReportLost = ({ user, onLogout }) => {
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip
-                avatar={<Avatar sx={{ bgcolor: '#0284c7' }}>{user?.name?.[0] || 'U'}</Avatar>}
-                label={`${user?.name || 'User'} • ${user?.role || 'Student'}`}
-                variant="outlined"
-                sx={{ fontWeight: 'bold', backgroundColor: '#ffffff' }}
-              />
-              <Button
-                variant="text"
-                color="inherit"
-                startIcon={<Logout />}
-                onClick={handleLogout}
-                sx={{ textTransform: 'none', color: '#64748b' }}
-              >
-                Logout
-              </Button>
+              <UserProfile user={user} />
             </Box>
           </Box>
 
@@ -267,7 +273,13 @@ const ReportLost = ({ user, onLogout }) => {
                       rows={3}
                       placeholder="Provide detailed description..."
                       value={description}
-                      onChange={(e) => setDescription(e.target.value)}
+                      onChange={(e) => {
+                        setDescription(e.target.value);
+                        setDescriptionApiError('');
+                      }}
+                      onBlur={() => setDescriptionTouched(true)}
+                      error={Boolean(descriptionError)}
+                      helperText={descriptionError || `Minimum ${MIN_DESCRIPTION_LENGTH} characters (${description.trim().length} entered)`}
                       required
                     />
                   </Box>
