@@ -10,3 +10,10 @@ body,
   width: 100%;
   min-height: 100vh;
 }
+.MuiTypography-root.app-logo {
+  font-family: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.4px;
+}

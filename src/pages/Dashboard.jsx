@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import UserProfile from '../components/UserProfile';
+import ReportDetailsDialog from '../components/ReportDetailsDialog';
+import ReportTag from '../components/ReportTag';
+import { useEffect, useState } from 'react';
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   Drawer,
   IconButton,
@@ -38,6 +39,7 @@ import {
   Search,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { searchItems } from '../services/itemService';
 import { getDashboardData } from '../services/dashboardService';
 import { logoutUser } from '../services/authService';
 
@@ -49,14 +51,6 @@ const menuItems = [
   { text: 'Report Found', icon: <AssignmentTurnedIn />, path: '/report-found' },
   { text: 'Search Reports', icon: <Search />, path: '/search-match' },
 ];
-
-// Status chip colours (background, text).
-const STATUS_STYLES = {
-  Open: { bg: '#fef3c7', color: '#d97706' },
-  Matched: { bg: '#e0e7ff', color: '#4f46e5' },
-  Claimed: { bg: '#cffafe', color: '#0891b2' },
-  Resolved: { bg: '#d1fae5', color: '#047857' },
-};
 
 // The API sends UTC times without a "Z", so add it before converting.
 const formatDate = (value) => {
@@ -92,6 +86,11 @@ const Dashboard = ({ user, onLogout }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [reportDetails, setReportDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
+  const [detailsAttempt, setDetailsAttempt] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -109,6 +108,36 @@ const Dashboard = ({ user, onLogout }) => {
     fetchDashboard();
   }, []);
 
+  useEffect(() => {
+    if (!selectedReport) return;
+    let cancelled = false;
+    // Use the existing search endpoint, which returns full report details.
+    searchItems({ type: selectedReport.type })
+      .then((items) => {
+        if (cancelled) return;
+        const item = items.find((item) => String(item.id) === String(selectedReport.id));
+        if (!item) {
+          setDetailsError('This report is no longer available.');
+          return;
+        }
+        setReportDetails(item);
+      })
+      .catch(() => {
+        if (!cancelled) setDetailsError('Unable to load report details. Please try again.');
+      })
+      .finally(() => {
+        if (!cancelled) setDetailsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedReport, detailsAttempt]);
+
+  const handleViewDetails = (report) => {
+    setReportDetails(null);
+    setDetailsError('');
+    setDetailsLoading(true);
+    setSelectedReport(report);
+  };
+
   const handleLogout = () => {
     logoutUser();
     if (onLogout) onLogout();
@@ -117,10 +146,10 @@ const Dashboard = ({ user, onLogout }) => {
 
   // Sidebar content, reused for the desktop and mobile drawers.
   const sidebar = (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', flex: 1 }}>
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #334155' }}>
         <School sx={{ fontSize: 28, color: '#38bdf8' }} />
-        <Typography variant="subtitle1" fontWeight="bold" lineHeight={1.3}>
+        <Typography className="app-logo" variant="subtitle1">
           Campus <br /> Lost & Found
         </Typography>
       </Box>
@@ -152,6 +181,16 @@ const Dashboard = ({ user, onLogout }) => {
           );
         })}
       </List>
+      <Box sx={{ mt: 'auto', p: 2, borderTop: '1px solid #334155' }}>
+        <Button
+          fullWidth
+          startIcon={<Logout />}
+          onClick={handleLogout}
+          sx={{ justifyContent: 'flex-start', color: '#ffffff', textTransform: 'none', borderRadius: 2, px: 2, py: 1.2, '&:hover': { backgroundColor: '#1e293b' } }}
+        >
+          Logout
+        </Button>
+      </Box>
     </Box>
   );
 
@@ -221,21 +260,7 @@ const Dashboard = ({ user, onLogout }) => {
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip
-                avatar={<Avatar sx={{ bgcolor: '#0284c7' }}>{user?.name?.[0] || 'U'}</Avatar>}
-                label={`${user?.name || 'User'} • ${user?.role || 'Student'}`}
-                variant="outlined"
-                sx={{ fontWeight: 'bold' }}
-              />
-              <Button
-                variant="text"
-                color="inherit"
-                startIcon={<Logout />}
-                onClick={handleLogout}
-                sx={{ textTransform: 'none', color: '#64748b' }}
-              >
-                Logout
-              </Button>
+              <UserProfile user={user} />
             </Box>
           </Box>
 
@@ -339,46 +364,40 @@ const Dashboard = ({ user, onLogout }) => {
                       <TableCell><strong>Category</strong></TableCell>
                       <TableCell><strong>Date</strong></TableCell>
                       <TableCell><strong>Status</strong></TableCell>
+                      <TableCell align="right"><strong>Details</strong></TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {dashboardData?.recentReports?.length > 0 ? (
                       dashboardData.recentReports.map((report) => {
-                        const statusStyle = STATUS_STYLES[report.status] || STATUS_STYLES.Open;
-                        const isLost = report.type === 'Lost';
                         return (
                           <TableRow key={report.id} hover>
                             <TableCell><strong>{report.name}</strong></TableCell>
                             <TableCell>
-                              <Chip
-                                label={report.type}
-                                size="small"
-                                sx={{
-                                  backgroundColor: isLost ? '#fecdd3' : '#d1fae5',
-                                  color: isLost ? '#e11d48' : '#047857',
-                                  fontWeight: 'bold',
-                                }}
-                              />
+                              <ReportTag kind="type" value={report.type} />
                             </TableCell>
                             <TableCell>{report.categoryName}</TableCell>
                             <TableCell>{formatDate(report.createdAt)}</TableCell>
                             <TableCell>
-                              <Chip
-                                label={report.status}
+                              <ReportTag kind="status" value={report.status} />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Button
                                 size="small"
-                                sx={{
-                                  backgroundColor: statusStyle.bg,
-                                  color: statusStyle.color,
-                                  fontWeight: 'bold',
-                                }}
-                              />
+                                variant="outlined"
+                                onClick={() => handleViewDetails(report)}
+                                aria-label={`View details for ${report.name}`}
+                                sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+                              >
+                                View Details
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
                       })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                        <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                           No recent reports available.
                         </TableCell>
                       </TableRow>
@@ -390,6 +409,26 @@ const Dashboard = ({ user, onLogout }) => {
           )}
         </Box>
       </Box>
+
+      {selectedReport && <ReportDetailsDialog
+        open={Boolean(selectedReport)}
+        selectedItem={reportDetails || selectedReport}
+        onClose={() => setSelectedReport(null)}
+        loading={detailsLoading}
+        loadError={detailsError}
+        onRetry={() => {
+          setDetailsError('');
+          setDetailsLoading(true);
+          setDetailsAttempt((attempt) => attempt + 1);
+        }}
+        onUpdated={async () => {
+          try {
+            setDashboardData(await getDashboardData());
+          } catch {
+            setError('Report updated, but dashboard could not refresh. Please reload the page.');
+          }
+        }}
+      />}
     </Box>
   );
 };

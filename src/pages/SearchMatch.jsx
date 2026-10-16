@@ -1,3 +1,6 @@
+import UserProfile from '../components/UserProfile';
+import ReportDetailsDialog from '../components/ReportDetailsDialog';
+import ReportTag from '../components/ReportTag';
 import { useState, useEffect } from 'react';
 import {
   Box,
@@ -12,16 +15,9 @@ import {
   TextField,
   MenuItem,
   Card,
-  Avatar,
-  Chip,
   IconButton,
   Alert,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Divider,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -38,8 +34,6 @@ import {
   getCategories,
   getLocations,
   searchItems,
-  confirmMatchPair,
-  updateItemStatus,
 } from '../services/itemService';
 import { logoutUser } from '../services/authService';
 import '../App.css';
@@ -72,10 +66,6 @@ const SearchMatch = ({ user, onLogout }) => {
   // Modal State for View Details
   const [selectedItem, setSelectedItem] = useState(null);
   const [openModal, setOpenModal] = useState(false);
-
-  // Confirm Pair Dialog State
-  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
-  const [foundItemIdToMatch, setFoundItemIdToMatch] = useState('');
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -156,40 +146,6 @@ const SearchMatch = ({ user, onLogout }) => {
     setSelectedItem(null);
   };
 
-  // Confirm Match Handler
-  const handleConfirmPairSubmit = async () => {
-    setError('');
-    setSuccess('');
-    try {
-      const lostId = selectedItem.type === 'Lost' ? selectedItem.id : Number(foundItemIdToMatch);
-      const foundId = selectedItem.type === 'Found' ? selectedItem.id : Number(foundItemIdToMatch);
-
-      await confirmMatchPair(lostId, foundId);
-
-      setSuccess('Match confirmed successfully! Dashboard counts updated.');
-      setOpenConfirmDialog(false);
-      setOpenModal(false);
-      loadLookupsAndItems();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to confirm match.');
-    }
-  };
-
-  // Update Status Handler
-  const handleUpdateStatus = async (newStatus) => {
-    setError('');
-    setSuccess('');
-    try {
-      await updateItemStatus(selectedItem.id, newStatus);
-
-      setSuccess(`Status updated to ${newStatus} successfully!`);
-      setOpenModal(false);
-      loadLookupsAndItems();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update status.');
-    }
-  };
-
   const handleLogout = () => {
     logoutUser();
     if (onLogout) onLogout();
@@ -197,10 +153,10 @@ const SearchMatch = ({ user, onLogout }) => {
   };
 
   const sidebar = (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', flex: 1 }}>
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #334155' }}>
         <School sx={{ fontSize: 28, color: '#38bdf8' }} />
-        <Typography variant="subtitle1" fontWeight="bold" lineHeight={1.3}>
+        <Typography className="app-logo" variant="subtitle1">
           Campus <br /> Lost & Found
         </Typography>
       </Box>
@@ -232,6 +188,16 @@ const SearchMatch = ({ user, onLogout }) => {
           );
         })}
       </List>
+      <Box sx={{ mt: 'auto', p: 2, borderTop: '1px solid #334155' }}>
+        <Button
+          fullWidth
+          startIcon={<Logout />}
+          onClick={handleLogout}
+          sx={{ justifyContent: 'flex-start', color: '#ffffff', textTransform: 'none', borderRadius: 2, px: 2, py: 1.2, '&:hover': { backgroundColor: '#1e293b' } }}
+        >
+          Logout
+        </Button>
+      </Box>
     </Box>
   );
 
@@ -289,21 +255,7 @@ const SearchMatch = ({ user, onLogout }) => {
             </Box>
 
             <Box className="search-match__account">
-              <Chip
-                avatar={<Avatar sx={{ bgcolor: '#0284c7' }}>{user?.name?.[0] || 'U'}</Avatar>}
-                label={`${user?.name || 'User'} • ${user?.role || 'Student'}`}
-                variant="outlined"
-                sx={{ fontWeight: 'bold', backgroundColor: '#ffffff' }}
-              />
-              <Button
-                variant="text"
-                color="inherit"
-                startIcon={<Logout />}
-                onClick={handleLogout}
-                sx={{ textTransform: 'none', color: '#64748b' }}
-              >
-                Logout
-              </Button>
+              <UserProfile user={user} />
             </Box>
           </Box>
 
@@ -453,7 +405,6 @@ const SearchMatch = ({ user, onLogout }) => {
           ) : (
             <Box className="search-match__results">
               {items.map((item) => {
-                const isLost = item.type === 'Lost';
                 return (
                   <Card key={item.id} elevation={0} className="search-match__result">
                     <Box className="search-match__result-row">
@@ -462,24 +413,8 @@ const SearchMatch = ({ user, onLogout }) => {
                           <Typography variant="subtitle1" fontWeight="bold" color="#0f172a">
                             {item.name}
                           </Typography>
-                          <Chip
-                            label={item.type}
-                            size="small"
-                            sx={{
-                              backgroundColor: isLost ? '#fecdd3' : '#d1fae5',
-                              color: isLost ? '#e11d48' : '#047857',
-                              fontWeight: 'bold',
-                            }}
-                          />
-                          <Chip
-                            label={item.status}
-                            size="small"
-                            sx={{
-                              backgroundColor: item.status === 'Open' ? '#fef3c7' : '#e0f2fe',
-                              color: item.status === 'Open' ? '#d97706' : '#0284c7',
-                              fontWeight: 'bold',
-                            }}
-                          />
+                          <ReportTag kind="type" value={item.type} />
+                          <ReportTag kind="status" value={item.status} />
                         </Box>
                         <Typography variant="body2" color="text.secondary">
                           {item.locationName} • {item.dateOccurred}
@@ -503,134 +438,15 @@ const SearchMatch = ({ user, onLogout }) => {
         </Box>
       </Box>
 
-      {/* Item Details Modal */}
-      <Dialog open={openModal} onClose={handleCloseModal} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold', backgroundColor: '#f8fafc' }}>
-          Item Details #{selectedItem?.id}
-        </DialogTitle>
-        <Divider />
-        <DialogContent className="search-match__details" sx={{ mt: 2 }}>
-          {selectedItem && (
-            <Box display="flex" flexDirection="column" gap={2}>
-              <Box>
-                <Typography variant="caption" color="text.secondary">Item Name</Typography>
-                <Typography variant="h6" fontWeight="bold">{selectedItem.name}</Typography>
-              </Box>
-
-              <Box display="flex" flexWrap="wrap" gap={2}>
-                <Chip
-                  label={`Type: ${selectedItem.type}`}
-                  color={selectedItem.type === 'Lost' ? 'error' : 'success'}
-                  variant="outlined"
-                />
-                <Chip
-                  label={`Status: ${selectedItem.status}`}
-                  color="warning"
-                  variant="outlined"
-                />
-              </Box>
-
-              <Box>
-                <Typography variant="caption" color="text.secondary">Category</Typography>
-                <Typography variant="body1" fontWeight="500">{selectedItem.categoryName}</Typography>
-              </Box>
-
-              <Box>
-                <Typography variant="caption" color="text.secondary">Location</Typography>
-                <Typography variant="body1" fontWeight="500">{selectedItem.locationName}</Typography>
-              </Box>
-
-              <Box>
-                <Typography variant="caption" color="text.secondary">Date Occurred</Typography>
-                <Typography variant="body1" fontWeight="500">{selectedItem.dateOccurred}</Typography>
-              </Box>
-
-              <Box>
-                <Typography variant="caption" color="text.secondary">Description</Typography>
-                <Typography variant="body2" className="search-match__description">
-                  {selectedItem.description}
-                </Typography>
-              </Box>
-
-              {/* Workflow Action Buttons Inside Details Modal */}
-              {selectedItem.status === 'Open' && (
-                <Box mt={2}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    fullWidth
-                    onClick={() => setOpenConfirmDialog(true)}
-                    sx={{ backgroundColor: '#0d9488', textTransform: 'none', fontWeight: 'bold' }}
-                  >
-                    Confirm Pair (Match)
-                  </Button>
-                </Box>
-              )}
-
-              {selectedItem.status === 'Matched' && (
-                <Box mt={2} display="flex" gap={2}>
-                  <Button
-                    variant="contained"
-                    color="info"
-                    fullWidth
-                    onClick={() => handleUpdateStatus('Claimed')}
-                    sx={{ textTransform: 'none', fontWeight: 'bold' }}
-                  >
-                    Mark as Claimed
-                  </Button>
-                </Box>
-              )}
-
-              {selectedItem.status === 'Claimed' && (
-                <Box mt={2} display="flex" gap={2}>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    fullWidth
-                    onClick={() => handleUpdateStatus('Resolved')}
-                    sx={{ textTransform: 'none', fontWeight: 'bold' }}
-                  >
-                    Mark as Resolved
-                  </Button>
-                </Box>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <Divider />
-        <DialogActions sx={{ p: 2, backgroundColor: '#f8fafc' }}>
-          <Button onClick={handleCloseModal} variant="contained" sx={{ backgroundColor: '#0f172a', textTransform: 'none' }}>
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Confirm Pair Dialog */}
-      <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Confirm this Pair?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Enter the corresponding opposite item ID (e.g. if this is Lost item #{selectedItem?.id}, enter Found item ID) to confirm match.
-          </Typography>
-          <TextField
-            fullWidth
-            size="small"
-            label="Opposite Item ID"
-            type="number"
-            value={foundItemIdToMatch}
-            onChange={(e) => setFoundItemIdToMatch(e.target.value)}
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenConfirmDialog(false)} variant="outlined" color="inherit">
-            Cancel
-          </Button>
-          <Button onClick={handleConfirmPairSubmit} variant="contained" sx={{ backgroundColor: '#0d9488' }}>
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {openModal && <ReportDetailsDialog
+        open={openModal}
+        selectedItem={selectedItem}
+        onClose={handleCloseModal}
+        onUpdated={async () => {
+          await loadLookupsAndItems();
+          setSuccess('Report updated successfully!');
+        }}
+      />}
     </Box>
   );
 };
