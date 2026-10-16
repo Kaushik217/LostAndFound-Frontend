@@ -32,6 +32,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getCategories, getLocations, createLostItem } from '../services/itemService';
 import { logoutUser } from '../services/authService';
 
+import { MIN_DESCRIPTION_LENGTH, validateDescription, getReportApiErrors } from '../utils/reportValidation';
+
 const drawerWidth = 240;
 
 const menuItems = [
@@ -44,6 +46,9 @@ const menuItems = [
 const ReportLost = ({ user, onLogout }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [descriptionTouched, setDescriptionTouched] = useState(false);
+  const [descriptionApiError, setDescriptionApiError] = useState('');
+  const descriptionError = descriptionApiError || (descriptionTouched ? validateDescription(description) : '');
   const [categoryId, setCategoryId] = useState('');
   const [locationId, setLocationId] = useState('');
   const [dateOccurred, setDateOccurred] = useState('');
@@ -81,7 +86,11 @@ const ReportLost = ({ user, onLogout }) => {
     setError('');
     setSuccess('');
 
-    if (!name || !description || !categoryId || !locationId || !dateOccurred) {
+    setDescriptionTouched(true);
+    setDescriptionApiError('');
+    if (validateDescription(description)) return;
+
+    if (!name || !categoryId || !locationId || !dateOccurred) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -90,7 +99,7 @@ const ReportLost = ({ user, onLogout }) => {
       setSubmitting(true);
       await createLostItem({
         name,
-        description,
+        description: description.trim(),
         categoryId: Number(categoryId),
         locationId: Number(locationId),
         dateOccurred,
@@ -100,7 +109,9 @@ const ReportLost = ({ user, onLogout }) => {
         navigate('/dashboard');
       }, 1500);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit report. Please try again.');
+      const apiErrors = getReportApiErrors(err.response?.data);
+      setDescriptionApiError(apiErrors.description);
+      setError(apiErrors.general);
     } finally {
       setSubmitting(false);
     }
@@ -267,7 +278,13 @@ const ReportLost = ({ user, onLogout }) => {
                       rows={3}
                       placeholder="Provide detailed description..."
                       value={description}
-                      onChange={(e) => setDescription(e.target.value)}
+                      onChange={(e) => {
+                        setDescription(e.target.value);
+                        setDescriptionApiError('');
+                      }}
+                      onBlur={() => setDescriptionTouched(true)}
+                      error={Boolean(descriptionError)}
+                      helperText={descriptionError || `Minimum ${MIN_DESCRIPTION_LENGTH} characters (${description.trim().length} entered)`}
                       required
                     />
                   </Box>
