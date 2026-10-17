@@ -411,6 +411,7 @@ const Dashboard = ({ user, onLogout }) => {
       </Box>
 
       {selectedReport && <ReportDetailsDialog
+        user={user}
         open={Boolean(selectedReport)}
         selectedItem={reportDetails || selectedReport}
         onClose={() => setSelectedReport(null)}

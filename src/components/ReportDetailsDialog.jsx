@@ -5,13 +5,15 @@ import ReportTag from './ReportTag';
 import { confirmMatchPair, updateItemStatus } from '../services/itemService';
 import '../App.css';
 
-export default function ReportDetailsDialog({ open, selectedItem, onClose, onUpdated, loading = false, loadError = '', onRetry }) {
+export default function ReportDetailsDialog({ open, selectedItem, user, onClose, onUpdated, loading = false, loadError = '', onRetry }) {
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [foundItemIdToMatch, setFoundItemIdToMatch] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const handleConfirmPairSubmit = async () => {
+    if (!canConfirmPair) return;
+
     const oppositeId = Number(foundItemIdToMatch);
     if (!Number.isInteger(oppositeId) || oppositeId <= 0) {
       setActionError('Enter a valid opposite item ID.');
@@ -35,6 +37,9 @@ export default function ReportDetailsDialog({ open, selectedItem, onClose, onUpd
   };
 
   const handleUpdateStatus = async (status) => {
+    if (status === 'Claimed' && !canMarkClaimed) return;
+    if (status === 'Resolved' && !canMarkResolved) return;
+
     setActionError('');
     setBusy(true);
     try {
@@ -60,6 +65,26 @@ export default function ReportDetailsDialog({ open, selectedItem, onClose, onUpd
   const paperSx = { borderRadius: 3, m: 2, width: 'calc(100% - 32px)', maxHeight: 'calc(100% - 32px)' };
   const buttonSx = { textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 3, py: 1 };
   const canAct = !loading && !loadError && selectedItem;
+  const isStudentOwner = user?.role === 'Student'
+    && user.userId != null
+    && selectedItem?.reporterId != null
+    && String(user.userId) === String(selectedItem.reporterId);
+  const canConfirmPair = canAct
+    && selectedItem.type === 'Lost'
+    && selectedItem.status === 'Open'
+    && (user?.role === 'Admin' || isStudentOwner);
+  const lostReportOwnerId = selectedItem?.type === 'Lost'
+    ? selectedItem.reporterId
+    : selectedItem?.lostReportOwnerId;
+  const isLostReportOwner = user?.userId != null
+    && lostReportOwnerId != null
+    && String(user.userId) === String(lostReportOwnerId);
+  const canMarkClaimed = canAct
+    && selectedItem.status === 'Matched'
+    && (user?.role === 'Admin' || isLostReportOwner);
+  const canMarkResolved = canAct
+    && selectedItem.status === 'Claimed'
+    && (user?.role === 'Admin' || isLostReportOwner);
 
   return (
     <>
@@ -108,10 +133,10 @@ export default function ReportDetailsDialog({ open, selectedItem, onClose, onUpd
         </DialogContent>
         <DialogActions sx={{ p: { xs: 2, sm: 3 }, gap: 1, borderTop: '1px solid #e2e8f0', bgcolor: '#f8fafc', flexWrap: 'wrap', '& > :not(style) ~ :not(style)': { ml: 0 } }}>
           <Button disabled={busy} onClick={closeDetails} variant="outlined" color="inherit" sx={buttonSx}>Close</Button>
-          {canAct && selectedItem.status === 'Open' && (
+          {canConfirmPair && (
             <Button disabled={busy} variant="contained" onClick={() => { setActionError(''); setOpenConfirmDialog(true); }} sx={{ ...buttonSx, bgcolor: '#0d9488', '&:hover': { bgcolor: '#0f766e' } }}>Confirm Pair (Match)</Button>
           )}
-          {canAct && ['Matched', 'Claimed'].includes(selectedItem.status) && (
+          {(canMarkClaimed || canMarkResolved) && (
             <Button disabled={busy} variant="contained" color={selectedItem.status === 'Matched' ? 'info' : 'success'} onClick={() => handleUpdateStatus(selectedItem.status === 'Matched' ? 'Claimed' : 'Resolved')} sx={buttonSx}>
               {busy ? 'Updating…' : selectedItem.status === 'Matched' ? 'Mark as Claimed' : 'Mark as Resolved'}
             </Button>
