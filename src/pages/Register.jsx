@@ -46,6 +46,11 @@ const Register = () => {
       return;
     }
 
+    if (password.length < 12 || password.length > 128) {
+      setError('The field Password must be a string with a minimum length of 12 and a maximum length of 128.');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -130,6 +135,8 @@ const Register = () => {
                 margin="normal"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                helperText="Password must be between 12 and 128 characters."
+                slotProps={{ htmlInput: { minLength: 12, maxLength: 128 } }}
                 disabled={loading}
                 required
                 InputProps={{
